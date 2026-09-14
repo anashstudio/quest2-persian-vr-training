@@ -1,0 +1,300 @@
+name: Build Quest 2 APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Android APK for Meta Quest 2
+    runs-on: ubuntu-22.04
+
+    env:
+      GODOT_VERSION: "4.7.2"
+      ANDROID_HOME: "${{ github.workspace }}/android-sdk"
+      ANDROID_SDK_ROOT: "${{ github.workspace }}/android-sdk"
+      JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64"
+
+    steps:
+
+      # ---------------------------------------------------------
+      # 1. دریافت سورس پروژه
+      # ---------------------------------------------------------
+      - name: Checkout project
+        uses: actions/checkout@v5
+
+      # ---------------------------------------------------------
+      # 2. نصب Java 17
+      # ---------------------------------------------------------
+      - name: Install Java 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-17-jdk unzip curl wget
+
+          java -version
+          echo "JAVA_HOME=$JAVA_HOME"
+          "$JAVA_HOME/bin/java" -version
+
+      # ---------------------------------------------------------
+      # 3. نصب Android Command Line Tools
+      # ---------------------------------------------------------
+      - name: Install Android SDK
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+
+          cd "$ANDROID_HOME/cmdline-tools"
+
+          wget -q --show-progress \
+            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+            -O commandlinetools.zip
+
+          unzip -q commandlinetools.zip
+
+          mv cmdline-tools latest
+
+          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+
+          yes | sdkmanager --licenses >/dev/null || true
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;28.1.13356709"
+
+          echo "Android SDK installed successfully."
+
+      # ---------------------------------------------------------
+      # 4. بررسی Android SDK
+      # ---------------------------------------------------------
+      - name: Verify Android SDK
+        shell: bash
+        run: |
+          set -e
+
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "JAVA_HOME=$JAVA_HOME"
+
+          sdkmanager --list | head -80
+
+          test -d "$ANDROID_HOME/platforms/android-35"
+          test -d "$ANDROID_HOME/build-tools/35.0.0"
+          test -d "$ANDROID_HOME/ndk/28.1.13356709"
+
+          echo "Android SDK verification completed."
+
+      # ---------------------------------------------------------
+      # 5. دریافت Godot
+      # ---------------------------------------------------------
+      - name: Download Godot
+        shell: bash
+        run: |
+          set -e
+
+          wget -q --show-progress \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" \
+            -O godot.zip
+
+          mkdir -p godot
+
+          unzip -q godot.zip -d godot
+
+          chmod +x \
+            "godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+
+          echo "Godot downloaded."
+
+      # ---------------------------------------------------------
+      # 6. دریافت Export Templates
+      # ---------------------------------------------------------
+      - name: Download Godot export templates
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+
+          wget -q --show-progress \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" \
+            -O templates.tpz
+
+          mkdir -p templates
+
+          unzip -q templates.tpz -d templates
+
+          cp -r \
+            templates/templates/* \
+            "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+
+          echo "Godot export templates installed."
+
+      # ---------------------------------------------------------
+      # 7. معرفی Android SDK و Java به Godot
+      # ---------------------------------------------------------
+      - name: Configure Godot Android paths
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p "$HOME/.config/godot"
+
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
+          [gd_resource format=3]
+
+          [resource]
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          export/android/android_sdk_path = "${ANDROID_HOME}"
+          EOF
+
+          echo "Godot Android paths configured."
+
+      # ---------------------------------------------------------
+      # 8. نصب OpenXR Vendors برای Meta Quest
+      # ---------------------------------------------------------
+      - name: Install OpenXR Vendors plugin
+        shell: bash
+        run: |
+          set -e
+          wget -q --show-progress \
+            "https://github.com/GodotVR/godot_openxr_vendors/releases/download/5.1.0-stable/godotopenxrvendorsaddon.zip" \
+            -O vendors.zip
+          mkdir -p vendor_extract addons
+          unzip -q vendors.zip -d vendor_extract
+          test -d vendor_extract/asset/addons/godotopenxrvendors
+          rm -rf addons/godotopenxrvendors
+          cp -r vendor_extract/asset/addons/godotopenxrvendors addons/godotopenxrvendors
+          test -f addons/godotopenxrvendors/plugin.gdextension
+          echo "OpenXR Vendors plugin installed."
+
+      # ---------------------------------------------------------
+      # 9. نصب Android Gradle Build Template
+      # ---------------------------------------------------------
+      - name: Install Android Gradle build template
+        shell: bash
+        run: |
+          set -e
+          ./godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 \
+            --headless \
+            --path . \
+            --editor \
+            --install-android-build-template
+          test -d android
+          echo "Android Gradle build template installed."
+
+      # ---------------------------------------------------------
+      # 10. بررسی ساختار پروژه
+      # ---------------------------------------------------------
+      - name: Check project files
+        shell: bash
+        run: |
+          set -e
+
+          echo "Project files:"
+          find . -maxdepth 3 -type f \
+            ! -path "./.git/*" \
+            | sort
+
+          echo "Checking required files..."
+
+          test -f project.godot
+          test -f export_presets.cfg
+          test -f main.tscn
+          test -f scripts/main.gd
+          test -f addons/godotopenxrvendors/plugin.gdextension
+          test -f addons/godotopenxrvendors/plugin.cfg
+
+          grep -q 'res://addons/godotopenxrvendors/plugin.cfg' project.godot
+          grep -q 'xr_features/xr_mode=1' export_presets.cfg
+          grep -q 'plugins/GodotOpenXRMeta=true' export_presets.cfg
+
+          echo "Required XR project files and settings found."
+
+      # ---------------------------------------------------------
+      # 11. Import / Validate پروژه
+      # ---------------------------------------------------------
+      - name: Validate Godot project
+        shell: bash
+        run: |
+          set -e
+
+          ./godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 \
+            --headless \
+            --path . \
+            --editor \
+            --quit
+
+          echo "Godot project validation completed."
+
+      # ---------------------------------------------------------
+      # 12. Disable ADB deployment; APK is built as an artifact only
+      # ---------------------------------------------------------
+      - name: Disable ADB deployment
+        shell: bash
+        run: |
+          set -e
+          echo "ADB is not required for APK generation."
+          pkill -f adb || true
+          echo "ADB deployment disabled."
+
+      # ---------------------------------------------------------
+      # 13. Build APK
+      # ---------------------------------------------------------
+      - name: Build Quest 2 APK
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p build
+
+          ./godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 \
+            --headless \
+            --path . \
+            --export-release \
+            "Meta Quest 2 - Android ARM64" \
+            build/Quest2-Persian-VR-Training.apk
+
+          test -f build/Quest2-Persian-VR-Training.apk
+
+          echo "APK successfully created."
+
+      # ---------------------------------------------------------
+      # 14. بررسی APK
+      # ---------------------------------------------------------
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -e
+
+          ls -lh build/Quest2-Persian-VR-Training.apk
+
+          file build/Quest2-Persian-VR-Training.apk
+
+          unzip -t \
+            build/Quest2-Persian-VR-Training.apk \
+            >/dev/null
+
+          echo "APK integrity check passed."
+
+      # ---------------------------------------------------------
+      # 15. قرار دادن APK برای دانلود
+      # ---------------------------------------------------------
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: Quest2-Persian-VR-Training-APK
+          path: build/Quest2-Persian-VR-Training.apk
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,2 @@
+This project code is provided for the user's educational project.
+The included Godot engine and any external dependencies retain their respective licenses.

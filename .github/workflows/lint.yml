@@ -1,0 +1,21 @@
+name: Validate project files
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Godot
+        run: |
+          curl -L --fail --retry 5 -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip -d godot
+          chmod +x godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64
+      - name: Headless parse/import check
+        run: |
+          godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 --headless --path . --editor --quit

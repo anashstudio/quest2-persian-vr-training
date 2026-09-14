@@ -1,0 +1,14 @@
+نسخه اصلاح واقعی Meta Quest 2
+
+مشکل نسخه قبلی: OpenXR Vendors plugin در زمان Build دانلود می‌شد، اما خود پروژه آن را به‌عنوان Editor Plugin فعال نکرده بود و Export Preset نیز کلید صریح GodotOpenXRMeta را نداشت. در نتیجه APK می‌توانست به‌صورت Android 2D اجرا شود.
+
+این نسخه:
+- OpenXR را در Project Settings فعال می‌کند.
+- Godot OpenXR Vendors plugin را به‌عنوان plugin فعال می‌کند.
+- Export Preset را با xr_features/xr_mode=1 تنظیم می‌کند.
+- پلاگین Meta با plugins/GodotOpenXRMeta=true فعال می‌شود.
+- Quest 2 در Meta XR Features فعال است.
+- Viewport.use_xr در شروع برنامه فعال می‌شود.
+- برنامه در صورت نبود OpenXR نباید وانمود کند که VR فعال است.
+
+این ساختار بر اساس الگوی رسمی Godot XR Template و مستندات Android/OpenXR تنظیم شده است.

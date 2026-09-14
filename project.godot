@@ -1,0 +1,49 @@
+; آموزش کاربری هدست واقعیت مجازی - Meta Quest 2
+; Godot 4.7.x / OpenXR
+config_version=5
+
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[application]
+config/icon="res://assets/icon.png"
+config/name="آموزش کاربری هدست واقعیت مجازی"
+config/description="آموزش تعاملی کاربری Meta Quest 2 برای مرکز منابع یادگیری - اداره آموزش و تعالی منابع انسانی شرکت پالایش نفت اصفهان"
+run/main_scene="res://main.tscn"
+
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/godotopenxrvendors/plugin.cfg")
+
+[display]
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/vram_compression/import_etc2_astc=true
+
+[display/window]
+vsync/vsync_mode=0
+
+[environment]
+defaults/default_clear_color=Color(0.025,0.035,0.055,1)
+
+[xr]
+openxr/default_action_map="res://openxr_action_map.tres"
+openxr/enabled=true
+openxr/startup_alert=true
+openxr/form_factor=0
+openxr/view_configuration=1
+openxr/reference_space=1
+openxr/environment_blend_mode=0
+shaders/enabled=true
+
+[android]
+export_format=0
+architectures/arm64-v8a=true
+architectures/armeabi-v7a=false
